@@ -1,7 +1,6 @@
 using System;
 using System.Text;
 using System.IO;
-using System.Web;
 using System.Security.Cryptography;
 using Org.BouncyCastle.Math;
 using Org.BouncyCastle.Crypto;
@@ -18,7 +17,7 @@ public class Crypto2
     var exponent = new BigInteger(exponentHexString);
     return new RsaKeyParameters(isPrivateKey, modulus, exponent);
   }
-  public static string Sign(string data, string privateModulusHexString, string privateExponentHexString)
+  public static string SignMod(string data, string privateModulusHexString, string privateExponentHexString)
   {
     /* Make the key */
     RsaKeyParameters key = MakeKey(privateModulusHexString, privateExponentHexString, true);
@@ -51,22 +50,24 @@ public class Crypto2
     signer.BlockUpdate(msgBytes, 0, msgBytes.Length);
     return signer.VerifySignature(expectedSig);
   }
-  protected void Page_Load(object sender, EventArgs e)
+  public static string Sign(string data, string privateKeyPath, string publicKeyPath)
   {
-    string data = "Hello World";
-    string privateKeyPath = "UAT_sign.key"; //System.Web.HttpContext.Current.Server.MapPath("~/App_Data/e-MOne-i.key");
-    string publicKeyPath = "UAT_sign.cer"; //System.Web.HttpContext.Current.Server.MapPath("~/App_Data/m1pay-fpx.cer");
-    var key = readPrivateKey(privateKeyPath);
+    var key = ReadPrivateKey(privateKeyPath);
     var publicKey = ReadCertificate(publicKeyPath);
-    var SignedData = Crypto2.Sign(data, ((RsaKeyParameters)key.Private).Modulus.ToString(), ((RsaKeyParameters)key.Private).Exponent.ToString());
-    bool result = Crypto2.Verify(data, SignedData, ((RsaKeyParameters)publicKey.GetPublicKey()).Modulus.ToString(), ((RsaKeyParameters)publicKey.GetPublicKey()).Exponent.ToString());
+    var signedData = Crypto2.SignMod(data, key.Modulus.ToString(), key.Exponent.ToString());
+    bool result = Crypto2.Verify(data, signedData, ((RsaKeyParameters)publicKey.GetPublicKey()).Modulus.ToString(), ((RsaKeyParameters)publicKey.GetPublicKey()).Exponent.ToString());
+    if (!result) {
+      throw new Exception("Unable to verify");
+    }
+    return signedData;
   }
-  static AsymmetricCipherKeyPair readPrivateKey(string privateKeyFileName)
+  static RsaKeyParameters ReadPrivateKey(string privateKeyFileName)
   {
-    AsymmetricCipherKeyPair keyPair;
-    using (var reader = File.OpenText(privateKeyFileName))
-    keyPair = (AsymmetricCipherKeyPair)new PemReader(reader).ReadObject();
-    return keyPair;
+    using (var reader = File.OpenText(privateKeyFileName)) {
+      var obj = new PemReader(reader).ReadObject();
+      var keyPair = (RsaKeyParameters)obj;
+      return keyPair;
+    }
   }
   static X509Certificate ReadCertificate(string filename)
   {
