@@ -138,3 +138,6 @@ _NCrunch*
 
 # misc
 /example.txt
+
+# idea
+.idea/

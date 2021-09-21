@@ -68,21 +68,35 @@ public class Crypto2
     stream.Close();
     return cert;
   }
-  public static string Sign(string data, string privateKeyPath, string publicKeyPath)
+  public static string Sign(string data, string privateKeyPath)
   {
     /* Get the bytes to be signed from the string */
     var bytes = Encoding.UTF8.GetBytes(data);
-    return Sign(bytes, privateKeyPath, publicKeyPath);
+    return Sign(bytes, privateKeyPath);
   }
   public static string Sign(byte[] bytes, string privateKeyPath, string publicKeyPath)
   {
-    var key = ReadPrivateKey(privateKeyPath);
-    var publicKey = ReadCertificate(publicKeyPath);
-    var signedData = Crypto2.SignBytes(bytes, key.Modulus.ToString(), key.Exponent.ToString());
-    bool result = Crypto2.Verify(bytes, signedData, ((RsaKeyParameters)publicKey.GetPublicKey()).Modulus.ToString(), ((RsaKeyParameters)publicKey.GetPublicKey()).Exponent.ToString());
-    if (!result) {
+    var signedData = Sign(bytes, privateKeyPath);
+    if (!Verify(bytes, signedData, publicKeyPath)) {
       throw new Exception("Unable to verify");
     }
     return signedData;
+  }
+  public static string Sign(byte[] bytes, string privateKeyPath)
+  {
+    var key = ReadPrivateKey(privateKeyPath);
+    var signedData = Crypto2.SignBytes(bytes, key.Modulus.ToString(), key.Exponent.ToString());
+    return signedData;
+  }
+  public static bool Verify(string data, string expectedSignature, string publicKeyPath)
+  {
+    /* Get the bytes to be signed from the string */
+    var bytes = Encoding.UTF8.GetBytes(data);
+    return Verify(bytes, expectedSignature, publicKeyPath);
+  }
+  public static bool Verify(byte[] msgBytes, string expectedSignature, string publicKeyPath)
+  {
+    var publicKey = ReadCertificate(publicKeyPath);
+    return Crypto2.Verify(msgBytes, expectedSignature, ((RsaKeyParameters)publicKey.GetPublicKey()).Modulus.ToString(), ((RsaKeyParameters)publicKey.GetPublicKey()).Exponent.ToString());
   }
 }
