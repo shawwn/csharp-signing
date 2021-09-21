@@ -17,7 +17,7 @@ public class Crypto2
     var exponent = new BigInteger(exponentHexString);
     return new RsaKeyParameters(isPrivateKey, modulus, exponent);
   }
-  public static string SignMod(string data, string privateModulusHexString, string privateExponentHexString)
+  public static string SignBytes(byte[] bytes, string privateModulusHexString, string privateExponentHexString)
   {
     /* Make the key */
     RsaKeyParameters key = MakeKey(privateModulusHexString, privateExponentHexString, true);
@@ -25,8 +25,6 @@ public class Crypto2
     ISigner sig = SignerUtilities.GetSigner("SHA256WITHRSA");
     /* Populate key */
     sig.Init(true, key);
-    /* Get the bytes to be signed from the string */
-    var bytes = Encoding.UTF8.GetBytes(data);
     /* Calc the signature */
     sig.BlockUpdate(bytes, 0, bytes.Length);
     byte[] signature = sig.GenerateSignature();
@@ -36,6 +34,12 @@ public class Crypto2
   }
   public static bool Verify(string data, string expectedSignature, string publicModulusHexString, string publicExponentHexString)
   {
+    /* Get the bytes to be signed from the string */
+    var msgBytes = Encoding.UTF8.GetBytes(data);
+    return Verify(msgBytes, expectedSignature, publicModulusHexString, publicExponentHexString);
+  }
+  public static bool Verify(byte[] msgBytes, string expectedSignature, string publicModulusHexString, string publicExponentHexString)
+  {
     /* Make the key */
     RsaKeyParameters key = MakeKey(publicModulusHexString, publicExponentHexString, false);
     /* Init alg */
@@ -44,22 +48,9 @@ public class Crypto2
     signer.Init(false, key);
     /* Get the signature into bytes */
     var expectedSig = Convert.FromBase64String(expectedSignature);
-    /* Get the bytes to be signed from the string */
-    var msgBytes = Encoding.UTF8.GetBytes(data);
     /* Calculate the signature and see if it matches */
     signer.BlockUpdate(msgBytes, 0, msgBytes.Length);
     return signer.VerifySignature(expectedSig);
-  }
-  public static string Sign(string data, string privateKeyPath, string publicKeyPath)
-  {
-    var key = ReadPrivateKey(privateKeyPath);
-    var publicKey = ReadCertificate(publicKeyPath);
-    var signedData = Crypto2.SignMod(data, key.Modulus.ToString(), key.Exponent.ToString());
-    bool result = Crypto2.Verify(data, signedData, ((RsaKeyParameters)publicKey.GetPublicKey()).Modulus.ToString(), ((RsaKeyParameters)publicKey.GetPublicKey()).Exponent.ToString());
-    if (!result) {
-      throw new Exception("Unable to verify");
-    }
-    return signedData;
   }
   static RsaKeyParameters ReadPrivateKey(string privateKeyFileName)
   {
@@ -76,5 +67,22 @@ public class Crypto2
     X509Certificate cert = certParser.ReadCertificate(stream);
     stream.Close();
     return cert;
+  }
+  public static string Sign(string data, string privateKeyPath, string publicKeyPath)
+  {
+    /* Get the bytes to be signed from the string */
+    var bytes = Encoding.UTF8.GetBytes(data);
+    return Sign(bytes, privateKeyPath, publicKeyPath);
+  }
+  public static string Sign(byte[] bytes, string privateKeyPath, string publicKeyPath)
+  {
+    var key = ReadPrivateKey(privateKeyPath);
+    var publicKey = ReadCertificate(publicKeyPath);
+    var signedData = Crypto2.SignBytes(bytes, key.Modulus.ToString(), key.Exponent.ToString());
+    bool result = Crypto2.Verify(bytes, signedData, ((RsaKeyParameters)publicKey.GetPublicKey()).Modulus.ToString(), ((RsaKeyParameters)publicKey.GetPublicKey()).Exponent.ToString());
+    if (!result) {
+      throw new Exception("Unable to verify");
+    }
+    return signedData;
   }
 }
